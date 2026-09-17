@@ -1,0 +1,56 @@
+[gd_resource type="TileSet" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/tiles/river_tiles.svg" id="1_lyc1d"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ffnuj"]
+texture = ExtResource("1_lyc1d")
+texture_region_size = Vector2i(44, 44)
+0:0/0 = 0
+0:0/0/custom_data_0 = 2
+0:0/0/custom_data_1 = 1.0
+1:0/0 = 0
+1:0/0/custom_data_0 = 2
+1:0/0/custom_data_1 = 1.0
+2:0/0 = 0
+2:0/0/custom_data_0 = 2
+2:0/0/custom_data_1 = 1.0
+3:0/0 = 0
+3:0/0/custom_data_0 = 2
+3:0/0/custom_data_1 = 1.0
+4:0/0 = 0
+4:0/0/custom_data_0 = 2
+4:0/0/custom_data_1 = 0.04
+5:0/0 = 0
+5:0/0/custom_data_0 = 2
+5:0/0/custom_data_1 = 0.15
+6:0/0 = 0
+6:0/0/custom_data_0 = 2
+6:0/0/custom_data_1 = 0.28
+7:0/0 = 0
+7:0/0/custom_data_0 = 2
+7:0/0/custom_data_1 = 0.4
+8:0/0 = 0
+8:0/0/custom_data_0 = 2
+8:0/0/custom_data_1 = 0.52
+9:0/0 = 0
+9:0/0/custom_data_0 = 2
+9:0/0/custom_data_1 = 0.65
+10:0/0 = 0
+10:0/0/custom_data_0 = 2
+10:0/0/custom_data_1 = 0.78
+11:0/0 = 0
+11:0/0/custom_data_0 = 2
+11:0/0/custom_data_1 = 0.9
+12:0/0 = 0
+12:0/0/custom_data_0 = 2
+12:0/0/custom_data_1 = 1.0
+
+[resource]
+tile_shape = 1
+tile_layout = 5
+tile_size = Vector2i(44, 22)
+custom_data_layer_0/name = "ground_level"
+custom_data_layer_0/type = 2
+custom_data_layer_1/name = "bed_height"
+custom_data_layer_1/type = 3
+sources/0 = SubResource("TileSetAtlasSource_ffnuj")

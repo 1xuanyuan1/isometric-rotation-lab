@@ -22,7 +22,9 @@ vec2 world(vec2 screen, float h) {
  vec2 q=(screen-origin)/camera_zoom; q.y=(q.y+h)/0.52;
  return vec2(cos(yaw)*q.x+sin(yaw)*q.y,-sin(yaw)*q.x+cos(yaw)*q.y)+focus;
 }
+#include "res://shaders/river.gdshaderinc"
 float pool(vec2 p,float h) {
+ if(river_enabled) return max(river_mask(p),wetness*smoothstep(0.55,0.63,noise(p/39.0))*(puddles_on ? 1.0 : 0.0));
  float n=noise(p/39.0)*0.74+noise(p/13.0)*0.26;
  return h<1.0 ? 1.0 : smoothstep(0.46,0.53,n) * (puddles_on ? 1.0 : 0.0);
 }
@@ -62,6 +64,7 @@ void fragment() {
   float edge=(1.0-abs(pool(p,h)*2.0-1.0))*wetness;
   col.rgb+=vec3(0.16,0.23,0.24)*edge*0.35;
   col.rgb+=vec3(0.42,0.59,0.65)*(rip.x*mask*0.40+rip.y*0.9);
+  if(river_enabled) { col.rgb=river_color(p,tint.rgb,rip); col.rgb+=vec3(0.4,0.6,0.7)*rip.y*0.5; }
  } else if(reflection) {
   float h=tint.a*64.0;
   vec2 p=world(screen_pos,h);
@@ -74,10 +77,10 @@ void fragment() {
   vec2 coord=UV-vec2(0,2);
   float frame_width=(coord.y>64.5/2048.0 ? 21.0 : 32.0)/1024.0;
   float frame=floor(coord.x/frame_width);
-  coord.x=clamp(coord.x+(sin(p.y*0.4+clock_time*2.2)+rip.z*2.0)*0.0005*wetness,frame*frame_width+0.0005,(frame+1.0)*frame_width-0.0005);
+  coord.x=clamp(coord.x+(sin(p.y*0.4+clock_time*2.2)+rip.z*2.0)*0.0005*max(wetness,river_enabled ? 1.0 : 0.0),frame*frame_width+0.0005,(frame+1.0)*frame_width-0.0005);
   col=texture(TEXTURE,coord);
   col.rgb=mix(col.rgb*vec3(0.39,0.53,0.60),vec3(0.18,0.29,0.34),0.24);
-  col.a*=pool(p,h)*wetness*valid*0.58*(reflections_on ? 1.0 : 0.0);
+  col.a*=pool(p,h)*max(wetness,river_enabled ? 1.0 : 0.0)*valid*0.58*(reflections_on ? 1.0 : 0.0);
  } else {
   col=texture(TEXTURE,UV)*tint;
   col.rgb=mix(col.rgb,col.rgb*vec3(0.57,0.69,0.77),wetness);

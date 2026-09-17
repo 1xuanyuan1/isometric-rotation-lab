@@ -10,9 +10,19 @@ var hero_frame := 0
 var hero_flip := false
 var hero_data: Dictionary
 var hero_tags: Dictionary = {}
-var weather_enabled := true
+@export_category("River")
+@export var river_enabled := true
+@export_range(0.05,0.95,0.01) var water_level := 0.52
+@export_range(0.0,2.0,0.05) var flow_speed := 0.65
+@export var auto_tide := false
+var bed_values: Dictionary = {}
+var river_label: Label
+var water_slider: HSlider
+var tide_button: Button
+var river_button: Button
+var weather_enabled := false
 var rain_intensity := 0.65
-var wetness := 1.0
+var wetness := 0.0
 var puddles_on := true
 var reflections_on := true
 var weather_material: ShaderMaterial
@@ -32,7 +42,6 @@ var auto_rotate := false
 var pixel_snap := false
 var show_grid := false
 var show_trees := true
-var seed_value := 7341
 var elapsed := 0.0
 var terrain: Array[Dictionary] = []
 var levels: Dictionary = {}
@@ -62,21 +71,13 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_load_hero()
 	_make_tree_textures()
-	_generate()
+	_load_map_data()
 	_build_ui()
 	_setup_weather()
+	if "--river-film" in OS.get_cmdline_user_args():
+		auto_tide = true
 	if "--rain-film" in OS.get_cmdline_user_args():
 		_toggle_auto()
-	if "--verify" in OS.get_cmdline_user_args():
-		_verify()
-		_reset()
-		get_tree().quit()
-	if "--sweep" in OS.get_cmdline_user_args():
-		await _sweep()
-		get_tree().quit()
-	if "--weather-test" in OS.get_cmdline_user_args():
-		await _weather_test()
-		get_tree().quit()
 	if "--capture" in OS.get_cmdline_user_args():
 		await get_tree().create_timer(3.0).timeout
 		for frame in 3: await get_tree().process_frame
@@ -90,27 +91,29 @@ func _ready() -> void:
 		get_viewport().get_texture().get_image().save_png("res://preview-rain-detail.png")
 		get_tree().quit()
 
-func _generate() -> void:
+func _load_map_data() -> void:
+	# The persisted TileMapLayer cells in main.tscn are the only map source.
+	var ground: TileMapLayer = $Ground
+	var trees: TileMapLayer = $Trees
+	ground.hide()
+	trees.hide()
 	batch_state.clear()
 	terrain.clear()
 	levels.clear()
-	var noise := FastNoiseLite.new()
-	noise.seed = seed_value
-	noise.frequency = 4.0 / map_size
-	noise.fractal_octaves = 3
-	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
-	for y in map_size:
-		for x in map_size:
-			var p := Vector2(x - map_size / 2.0, y - map_size / 2.0)
-			var n := noise.get_noise_2d(x, y) + 0.27 - pow(p.length() / (map_size * 0.646), 3.0) * 0.43
-			var level := 0
-			if n > -0.06: level = 1
-			if n > 0.045: level = 2
-			if n > 0.30: level = 3
-			levels[Vector2i(x,y)] = level
-			terrain.append({"grid":Vector2i(x,y), "p":p * TILE, "level":level, "variant":rng.randf(), "tree":level >= 2 and rng.randf() < 0.34, "type":rng.randi_range(0, 2)})
-
+	bed_values.clear()
+	var bounds := ground.get_used_rect()
+	map_size = maxi(1,maxi(bounds.size.x,bounds.size.y))
+	for original in ground.get_used_cells():
+		var data := ground.get_cell_tile_data(original)
+		if data == null: continue
+		var grid := original-bounds.position
+		var p := (Vector2(grid)-Vector2.ONE*map_size/2.0)*TILE
+		var level: int = data.get_custom_data("ground_level")
+		var bed: float = data.get_custom_data("bed_height")
+		levels[grid] = level
+		bed_values[grid] = bed
+		var variant := float(posmod(grid.x*73+grid.y*37,101))/101.0
+		terrain.append({"grid":grid,"p":p,"level":level,"variant":variant,"tree":trees.get_cell_source_id(original)>=0,"type":posmod(grid.x+grid.y,3)})
 	_place_hero()
 	if weather_material: _update_height_map()
 
@@ -124,6 +127,10 @@ func _unproject_delta(d: Vector2) -> Vector2:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	if auto_tide and river_enabled:
+		water_level = 0.50+sin(elapsed*0.36)*0.40
+		water_slider.set_value_no_signal(water_level)
+	_keep_hero_on_bank()
 	wetness = move_toward(wetness, 1.0 if weather_enabled else 0.0, delta * 0.65)
 	view_size = get_viewport_rect().size
 	scene_origin = Vector2(330 + (view_size.x - 330) * 0.5, view_size.y * 0.53)
@@ -166,6 +173,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_G: show_grid = not show_grid
 			KEY_P: pixel_snap = not pixel_snap
 			KEY_T: show_trees = not show_trees
+			KEY_B: river_enabled = not river_enabled
+			KEY_L: auto_tide = not auto_tide
 			KEY_F: focus = hero_position
 			KEY_H: weather_enabled = not weather_enabled
 			KEY_J: puddles_on = not puddles_on
@@ -387,10 +396,10 @@ func _build_ui() -> void:
 	sidebar.size = Vector2(292,852)
 	sidebar.add_theme_stylebox_override("panel",_style(Color("0e202a"),Color("263b43")))
 	root.add_child(sidebar)
-	_label(sidebar,"FIELD NOTES     /     EXPERIMENT 02",Vector2(24,22),11,"96b496")
+	_label(sidebar,"FIELD NOTES     /     EXPERIMENT 03",Vector2(24,22),11,"96b496")
 	_label(sidebar,"VERDANT",Vector2(22,52),34)
-	_label(sidebar,"Rotation + rain studies",Vector2(24,98),16,"96abb2")
-	_label(sidebar,"Minato explores the rain.",Vector2(24,132),13,"708c98")
+	_label(sidebar,"River + weather studies",Vector2(24,98),16,"96abb2")
+	_label(sidebar,"Painted tiles. Living rivers.",Vector2(24,132),13,"708c98")
 	_label(sidebar,"CAMERA ORBIT",Vector2(24,191),11,"96b496")
 	angle_label = _label(sidebar,"045°",Vector2(22,211),52)
 	_label(sidebar,"Around the focal point",Vector2(24,277),13,"839ca7")
@@ -402,8 +411,9 @@ func _build_ui() -> void:
 	grid_button = _button(sidebar,"Tile grid   /   G",Vector2(24,523),115,func(): show_grid = not show_grid)
 	trees_button = _button(sidebar,"Trees   /   T",Vector2(151,523),115,func(): show_trees = not show_trees)
 	for button in [pixel_button, grid_button, trees_button]: button.toggle_mode = true
-	_button(sidebar,"New islands",Vector2(24,587),115,func(): seed_value += 17; _generate())
-	_button(sidebar,"32 / 48 tiles",Vector2(151,587),115,func(): map_size = 48 if map_size == 32 else 32; zoom = 33.28 / map_size; _generate())
+	_button(sidebar,"Reload tiles",Vector2(24,587),115,_load_map_data)
+	river_button = _button(sidebar,"River / B",Vector2(151,587),115,func(): river_enabled = not river_enabled)
+	river_button.toggle_mode = true
 	_button(sidebar,"Reset camera   /   R",Vector2(24,639),242,_reset)
 	weather_button = _button(sidebar,"Rain / H",Vector2(24,699),115,func(): weather_enabled = not weather_enabled)
 	puddle_button = _button(sidebar,"Puddles / J",Vector2(151,699),115,func(): puddles_on = not puddles_on)
@@ -416,8 +426,8 @@ func _build_ui() -> void:
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header.add_theme_stylebox_override("panel",_style(Color("09151d")))
 	root.add_child(header)
-	_label(root,"THE EMERALD ARCHIPELAGO",Vector2(352,35),20)
-	_label(root,"Rainfall   /   Wet ground   /   Reflections   /   Ripples",Vector2(353,70),13,"7d99a5")
+	_label(root,"THE EMERALD RIVER",Vector2(352,35),20)
+	_label(root,"Paintable riverbed   /   Dynamic waterline   /   Flow & refraction",Vector2(353,70),13,"7d99a5")
 	weather_label = _label(root,"RAIN INTENSITY",Vector2(1020,36),12,"a4bac6")
 	var intensity := HSlider.new()
 	intensity.position = Vector2(1190,44)
@@ -429,6 +439,37 @@ func _build_ui() -> void:
 	intensity.value = rain_intensity
 	intensity.value_changed.connect(func(value: float): rain_intensity = value)
 	root.add_child(intensity)
+	var river_panel := Panel.new()
+	river_panel.position = Vector2(350,714)
+	river_panel.size = Vector2(1056,78)
+	river_panel.add_theme_stylebox_override("panel",_style(Color("102732"),Color("355461")))
+	root.add_child(river_panel)
+	river_label = _label(river_panel,"WATER LEVEL",Vector2(18,10),12,"b6d3cc")
+	water_slider = HSlider.new()
+	water_slider.position = Vector2(18,42)
+	water_slider.size = Vector2(360,22)
+	water_slider.min_value = 0.05
+	water_slider.max_value = 0.95
+	water_slider.step = 0.01
+	water_slider.value = water_level
+	water_slider.focus_mode = Control.FOCUS_NONE
+	water_slider.value_changed.connect(func(value: float): water_level = value; auto_tide = false)
+	river_panel.add_child(water_slider)
+	tide_button = _button(river_panel,"Auto tide / L",Vector2(413,20),160,func(): auto_tide = not auto_tide)
+	tide_button.toggle_mode = true
+	_label(river_panel,"FLOW SPEED",Vector2(610,10),12,"b6d3cc")
+	var flow := HSlider.new()
+	flow.position = Vector2(610,42)
+	flow.size = Vector2(215,22)
+	flow.min_value = 0.0
+	flow.max_value = 2.0
+	flow.step = 0.05
+	flow.value = flow_speed
+	flow.focus_mode = Control.FOCUS_NONE
+	flow.value_changed.connect(func(value: float): flow_speed = value)
+	river_panel.add_child(flow)
+	_label(river_panel,"LOW: exposed bed
+HIGH: flooded banks",Vector2(858,21),12,"8caeb7")
 	var footer := Panel.new()
 	footer.position = Vector2(350,805)
 	footer.size = Vector2(1056,70)
@@ -436,7 +477,7 @@ func _build_ui() -> void:
 	footer.add_theme_stylebox_override("panel",_style(Color("0e202a"),Color("263b43")))
 	root.add_child(footer)
 	_label(footer,"Arrows   Move Minato    F   Find him    Q/E   Orbit    WASD / Drag   Pan    Scroll   Zoom    Space   Auto",Vector2(22,14),14,"b9ccc4")
-	_label(footer,"Studies: BV1x32vBREVZ + BV1s6rDBpEvo    ·    H Rain    /    J Puddles    /    K Reflections",Vector2(22,41),11,"678795")
+	_label(footer,"DEV LOG.03 / BV1KyjN6iEzq    ·    H Rain    /    J Puddles    /    K Reflections",Vector2(22,41),11,"678795")
 
 func _toggle_auto() -> void:
 	auto_rotate = not auto_rotate
@@ -448,49 +489,6 @@ func _reset() -> void:
 	focus = Vector2.ZERO
 	auto_rotate = false
 	play_button.text = "▶   Auto orbit"
-
-func _verify() -> void:
-	assert(terrain.size() == map_size * map_size)
-	var before := terrain.duplicate(true)
-	_generate()
-	assert(before == terrain, "The same seed must reproduce terrain")
-	for yaw in [0.0, PI/4, PI/2, PI, TAU]:
-		angle = yaw
-		var p := Vector2(142,-83)
-		assert(_unproject_delta(_project(p) - scene_origin).distance_to(p-focus) < 0.001)
-		assert(_project(focus).distance_to(scene_origin) < 0.001)
-	var count := 0
-	for cell in terrain:
-		if cell.tree:
-			assert(cell.level >= 2)
-			count += 1
-	assert(count > 30)
-	print("VERIFY PASS: deterministic ", terrain.size(), " tiles; ", count, " trees; projection inverse and focal-point invariance at five angles.")
-
-func _sweep() -> void:
-	# Exercise actual draw calls at cardinal, diagonal and intermediate angles.
-	for snap in [false, true]:
-		pixel_snap = snap
-		for degrees in [0, 1, 45, 89, 90, 135, 180, 225, 270, 315, 359]:
-			angle = deg_to_rad(degrees)
-			await get_tree().process_frame
-			await get_tree().process_frame
-			if degrees == 135 and not snap and DisplayServer.get_name() != "headless":
-				await RenderingServer.frame_post_draw
-				get_viewport().get_texture().get_image().save_png("res://preview-135.png")
-	pixel_snap = false
-	var event := InputEventKey.new()
-	event.pressed = true
-	event.physical_keycode = KEY_SPACE
-	_unhandled_input(event)
-	assert(auto_rotate)
-	var previous := angle
-	await get_tree().process_frame
-	await get_tree().process_frame
-	assert(angle != previous)
-	_reset()
-	assert(not auto_rotate and focus == Vector2.ZERO)
-	print("SWEEP PASS: 22 angle/snap combinations rendered; auto-orbit and reset verified.")
 
 func _draw_reflection(cell: Dictionary) -> void:
 	var h := float(cell.level)*7.0
@@ -521,9 +519,19 @@ func _update_height_map() -> void:
 		map.set_pixelv(cell.grid,Color(cell.level*7.0/255.0,0,0,1))
 	weather_material.set_shader_parameter("height_map",ImageTexture.create_from_image(map))
 	weather_material.set_shader_parameter("map_size",float(map_size))
+	var bed_image := Image.create(map_size,map_size,false,Image.FORMAT_RGBA8)
+	bed_image.fill(Color.WHITE)
+	for grid in bed_values: bed_image.set_pixelv(grid,Color(bed_values[grid],bed_values[grid],bed_values[grid],1))
+	weather_material.set_shader_parameter("river_bed",ImageTexture.create_from_image(bed_image))
 
 func _update_weather() -> void:
 	if not weather_material: return
+	weather_material.set_shader_parameter("river_enabled",river_enabled)
+	weather_material.set_shader_parameter("water_level",water_level)
+	weather_material.set_shader_parameter("flow_speed",flow_speed)
+	river_label.text = "WATER LEVEL  %02d%%   /   SHALLOW WATER IS WALKABLE" % roundi(water_level*100)
+	tide_button.set_pressed_no_signal(auto_tide)
+	river_button.set_pressed_no_signal(river_enabled)
 	weather_material.set_shader_parameter("wetness",wetness)
 	weather_material.set_shader_parameter("clock_time",elapsed)
 	weather_material.set_shader_parameter("rain_amount",rain_intensity if weather_enabled else 0.0)
@@ -542,38 +550,6 @@ func _update_weather() -> void:
 	reflection_button.set_pressed_no_signal(reflections_on)
 	weather_label.text = "RAIN  %d%%" % roundi(rain_intensity*100) if weather_enabled else "CLEAR SKIES"
 
-func _weather_test() -> void:
-	for size in [32,48]:
-		map_size = size
-		_generate()
-		_reset()
-		for yaw_degrees in [0,45,90,135,225,315]:
-			angle = deg_to_rad(yaw_degrees)
-			for frame in 2: await get_tree().process_frame
-			assert(weather_material.get_shader_parameter("map_size") == float(size))
-			assert(is_equal_approx(weather_material.get_shader_parameter("yaw"),angle))
-	map_size = 32
-	_generate()
-	_reset()
-	for key in [KEY_H,KEY_J,KEY_K]:
-		var event := InputEventKey.new()
-		event.pressed = true
-		event.physical_keycode = key
-		_unhandled_input(event)
-	assert(not weather_enabled and not puddles_on and not reflections_on)
-	wetness = 0.0
-	for frame in 3: await get_tree().process_frame
-	assert(rain_material.get_shader_parameter("strength") == 0.0)
-	if DisplayServer.get_name() != "headless":
-		await RenderingServer.frame_post_draw
-		get_viewport().get_texture().get_image().save_png("res://preview-clear.png")
-	weather_enabled = true
-	puddles_on = true
-	reflections_on = true
-	wetness = 1.0
-	for frame in 4: await get_tree().process_frame
-	print("WEATHER PASS: 12 map/angle combinations; weather, puddle and reflection toggles; dry shader state.")
-
 # Match black-sword ActorVisual OCAD regions, not the legacy npc.json grid.
 func _load_hero() -> void:
 	hero_data = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/minato.json"))
@@ -582,12 +558,9 @@ func _load_hero() -> void:
 func _place_hero() -> void:
 	var nearest := INF
 	for cell in terrain:
-		if cell.level >= 2 and cell.p.length_squared() < nearest:
+		if cell.level >= 2 and not cell.tree and (not river_enabled or _bed_height(cell.p) > 0.95) and cell.p.length_squared() < nearest:
 			nearest = cell.p.length_squared()
 			hero_position = cell.p
-	# A small starting clearing keeps the imported character visible immediately.
-	for cell in terrain:
-		if cell.p.distance_to(hero_position) < TILE*2.0: cell.tree = false
 	focus = hero_position
 	hero_time = 0.0
 	hero_frame = 0
@@ -598,6 +571,7 @@ func _hero_level(at: Vector2) -> int:
 
 func _hero_can_walk(at: Vector2) -> bool:
 	var next_level := _hero_level(at)
+	if river_enabled and water_level-_bed_height(at) > 0.12: return false
 	if next_level < 1 or absi(next_level-_hero_level(hero_position)) > 1: return false
 	if show_trees:
 		for cell in terrain:
@@ -659,3 +633,26 @@ func _draw_hero(reflected: bool) -> void:
 		region.position.x += region.size.x
 		region.size.x = -region.size.x
 	_poly(PackedVector2Array([rect.position,rect.position+Vector2(rect.size.x,0),rect.end,rect.position+Vector2(0,rect.size.y)]),tint,region)
+
+func _bed_height(at: Vector2) -> float:
+	# Same bilinear interpolation and 8-bit quantization as the shader texture.
+	var q := (at/TILE+Vector2.ONE*map_size/2.0).clamp(Vector2.ZERO,Vector2.ONE*(map_size-1))
+	var cell := Vector2i(q.floor())
+	var f := q-q.floor()
+	var a := roundf(float(bed_values.get(cell,1.0))*255.0)/255.0
+	var b := roundf(float(bed_values.get(cell+Vector2i(1,0),1.0))*255.0)/255.0
+	var c := roundf(float(bed_values.get(cell+Vector2i(0,1),1.0))*255.0)/255.0
+	var d := roundf(float(bed_values.get(cell+Vector2i.ONE,1.0))*255.0)/255.0
+	return lerpf(lerpf(a,b,f.x),lerpf(c,d,f.x),f.y)
+
+func _keep_hero_on_bank() -> void:
+	if not river_enabled or water_level-_bed_height(hero_position) <= 0.12: return
+	var nearest := INF
+	var safe := hero_position
+	for cell in terrain:
+		if cell.tree or cell.level<1 or water_level-_bed_height(cell.p)>0.08: continue
+		var distance: float = hero_position.distance_squared_to(cell.p)
+		if distance < nearest:
+			nearest = distance
+			safe = cell.p
+	hero_position = safe
