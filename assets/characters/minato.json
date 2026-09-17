@@ -1,0 +1,230 @@
+{
+  "frames": [
+    {
+      "frame": {
+        "x": 189,
+        "y": 126,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 231,
+        "y": 126,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 210,
+        "y": 126,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 126,
+        "y": 0,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 147,
+        "y": 0,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 168,
+        "y": 0,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 189,
+        "y": 0,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 210,
+        "y": 0,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 231,
+        "y": 0,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 126,
+        "y": 42,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 147,
+        "y": 42,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 168,
+        "y": 42,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 189,
+        "y": 42,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 210,
+        "y": 42,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 231,
+        "y": 42,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 0,
+        "y": 84,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 21,
+        "y": 84,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 42,
+        "y": 84,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 63,
+        "y": 84,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 84,
+        "y": 84,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    },
+    {
+      "frame": {
+        "x": 105,
+        "y": 84,
+        "w": 21,
+        "h": 42
+      },
+      "duration": 100
+    }
+  ],
+  "meta": {
+    "frameTags": [
+      {
+        "name": "Idle_front",
+        "from": 0,
+        "to": 0
+      },
+      {
+        "name": "Idle_back",
+        "from": 1,
+        "to": 1
+      },
+      {
+        "name": "Idle_side",
+        "from": 2,
+        "to": 2
+      },
+      {
+        "name": "Walk_front",
+        "from": 3,
+        "to": 8
+      },
+      {
+        "name": "Walk_back",
+        "from": 9,
+        "to": 14
+      },
+      {
+        "name": "Walk_side",
+        "from": 15,
+        "to": 20
+      }
+    ],
+    "source": "black-sword/scripts/actor_visual.gd: OCAD_IDLE_* / OCAD_WALK_*",
+    "side_faces": "left; flip horizontally for right",
+    "frame_height": 42
+  }
+}
